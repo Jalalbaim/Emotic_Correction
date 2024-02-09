@@ -94,3 +94,5 @@ for image_file in image_files:
         output_folder = "./outputs"
         save_outputs(output_folder, bboxes_scaled, probas[keep], image_path)
         j+=1
+
+# Fin
