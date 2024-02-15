@@ -14,9 +14,12 @@ This script is written to correct the Emotic Dataset annotations using the DETR 
 
 @author: Jalal
 """
+# Check for CUDA and set the default device
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device}")
 
 # Importing model 
-model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True)
+model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True).to(device)
 model.eval()
 
 # functions
@@ -31,7 +34,7 @@ transform = T.Compose([
 def rescale_bboxes(out_bbox, size):
     img_w, img_h = size
     b = box_cxcywh_to_xyxy(out_bbox)
-    b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32)
+    b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32).to(device)
     return b
 
 def box_cxcywh_to_xyxy(x):
@@ -41,7 +44,7 @@ def box_cxcywh_to_xyxy(x):
     return torch.stack(b, dim=1)
 
 def model_results(img):
-    img = transform(img).unsqueeze(0)
+    img = transform(img).unsqueeze(0).to(device)
     outputs = model(img)
     # keep only predictions with 0.9+ confidence and labeled as "person"
     probas = outputs['pred_logits'].softmax(-1)[0, :, :-1]
