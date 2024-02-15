@@ -10,7 +10,7 @@ import json
 """
 Description:
 
-This script is written to correct the Emotic Dataset annotations using the DETR model as a SOA model for correction in order to improve our BeNeT Scores.
+This script is written to correct the Emotic Dataset annotations using the DETR model as a SOA model for correction in order to improve  BeNeT Scores.
 
 @author: Jalal
 """
