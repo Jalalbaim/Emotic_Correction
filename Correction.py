@@ -108,51 +108,65 @@ def main():
     for image in train_img:
         # image est le dictionnaire d'information d'une image
         # train image est le dictionnaire d'information de toutes les images
-        if i<100: # pour tester sur les 100 premières images
-            file_name = image['file_name']
-            folder = image['folder']
-            img_path = original_path + '/' + folder + '/' + file_name
-            img = Image.open(img_path)
-            bboxes , probas = model_results(img)
-            list_appair.append({'id': image['id'], 'bboxes': bboxes})
-        i+=1
+        file_name = image['file_name']
+        folder = image['folder']
+        img_path = original_path + '/' + folder + '/' + file_name
+        img = Image.open(img_path)
+        bboxes , probas = model_results(img)
+        list_appair.append({'id': image['id'], 'bboxes': bboxes})
     
     ## Processing annotations part 
         
     train_new_annots = train_anno
 
+    new_annotations = []
+    new_id = 0
+
     for i, anno in enumerate(train_new_annots):
-        if i < 100: # pour tester sur les 100 premières images
-            img_id = anno['image_id']
-            anno_id = anno['id']
-            bbox = anno['bbox']
-            
-            # Check if bbox is not already a list of lists
-            if not isinstance(bbox[0], list):
-                bbox = [bbox]
-            
-            #print(img_id, anno_id, bbox)
-            
-            for appair in list_appair:
+        img_id = anno['image_id']
+        category_id = anno['category_id']
+        bbox = anno['bbox']
+        if not isinstance(bbox[0], list):
+            bbox = [bbox]  # Assurez-vous que bbox est une liste de listes
+        
+        # Trouver l'appariement pour cet image_id
+        for appair in list_appair:
+            if i<12:
                 if appair['id'] == img_id:
-                    # Initialize new annotations list for managing bboxes for each image
                     new_annots = []
-                    
-                    for single_bbox in bbox:  # Use single_bbox to avoid confusion with the outer bbox
+                    # Comparer chaque bbox à ceux dans appair et ajuster selon get_iou
+                    for single_bbox in bbox:
                         for bbox2 in appair['bboxes']:
                             new_annots = get_iou(single_bbox, bbox2, 0.99, new_annots)
-                    
-                    anno['bbox'] = remove_duplicates(new_annots)
-            # Extend the annotations categories list with None for the remaining bboxes
-            if len(train_anno[i]['bbox']) > len(train_new_annots[i]['annotations_categories']):
-                train_new_annots[i]['annotations_categories'].extend([None] * (len(train_anno[i]['bbox']) - len(train_new_annots[i]['annotations_categories'])))
+                    new_bbox = remove_duplicates(new_annots)
+        
+        # S'assurer que annotations_categories est ajusté si nécessaire
+        extended_categories = anno['annotations_categories'][:]
+        if len(new_bbox) > len(extended_categories):
+            extended_categories.extend([None] * (len(new_bbox) - len(extended_categories)))
+        
+        # Créer une nouvelle annotation pour chaque bbox ajusté
+        for j, single_bbox in enumerate(new_bbox):
+            new_anno = {
+                'image_id': img_id,
+                'id': new_id,
+                'category_id': category_id,
+                'bbox': single_bbox,
+                'coco_ids': anno['coco_ids'],
+                'annotations_categories': extended_categories[j] if j < len(extended_categories) else None,
+                'annotations_continuous': anno['annotations_continuous'],
+                'gender': anno['gender'],
+                'age': anno['age'],
+            }
+            new_annotations.append(new_anno)
+            new_id += 1
     
     # Save the new annotations as a JSON file
                 
     filename = './newest' + os.path.basename(path)
 
     # Create a dictionary with the images and annotations
-    mixed_data = {'images': train_img, 'annotations': train_new_annots}
+    mixed_data = {'images': train_img, 'annotations': new_annotations}
 
     # Save the mixed data as a JSON file
     with open(filename, 'w') as f:
