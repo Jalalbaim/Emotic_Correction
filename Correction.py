@@ -176,7 +176,7 @@ def main():
     filename = './newest' + os.path.basename(path)
 
     # Create a dictionary with the images and annotations
-    mixed_data = {'images': train_img, 'annotations': new_annotations}
+    mixed_data = {'images': train_img, 'annotations': new_annotations, 'categories': train['categories']}
 
     # Save the mixed data as a JSON file
     with open(filename, 'w') as f:
