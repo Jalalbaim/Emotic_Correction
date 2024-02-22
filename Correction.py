@@ -27,9 +27,14 @@ model.eval()
 # standard PyTorch mean-std input image normalization
 transform = T.Compose([
     T.Resize(800),
+    T.Lambda(lambda img: img.convert('RGB')),
     T.ToTensor(),
     T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
+
+def transform_image(img):
+    transformed_img = transform(img)
+    return transformed_img
 
 def rescale_bboxes(out_bbox, size):
     img_w, img_h = size
@@ -44,7 +49,7 @@ def box_cxcywh_to_xyxy(x):
     return torch.stack(b, dim=1)
 
 def model_results(img):
-    img = transform(img).unsqueeze(0).to(device)
+    img = transform_image(img).unsqueeze(0).to(device)
     outputs = model(img)
     # keep only predictions with 0.9+ confidence and labeled as "person"
     probas = outputs['pred_logits'].softmax(-1)[0, :, :-1]
@@ -104,8 +109,10 @@ def main():
     original_path = "EMOTIC (1)/EMOTIC/PAMI/emotic"
     # liste d'appairement des images et des annotations en dictionnaires
     list_appair = []
-    i = 0
+    k = 0
     for image in train_img:
+        if k%100 == 0:
+            print(f"Processed {k} images")  
         # image est le dictionnaire d'information d'une image
         # train image est le dictionnaire d'information de toutes les images
         file_name = image['file_name']
@@ -114,6 +121,7 @@ def main():
         img = Image.open(img_path)
         bboxes , probas = model_results(img)
         list_appair.append({'id': image['id'], 'bboxes': bboxes})
+        k+=1
     
     ## Processing annotations part 
         
@@ -123,6 +131,7 @@ def main():
     new_id = 0
 
     for i, anno in enumerate(train_new_annots):
+        i+=1
         img_id = anno['image_id']
         category_id = anno['category_id']
         bbox = anno['bbox']
@@ -131,20 +140,21 @@ def main():
         
         # Trouver l'appariement pour cet image_id
         for appair in list_appair:
-            if i<12:
-                if appair['id'] == img_id:
-                    new_annots = []
-                    # Comparer chaque bbox à ceux dans appair et ajuster selon get_iou
-                    for single_bbox in bbox:
-                        for bbox2 in appair['bboxes']:
-                            new_annots = get_iou(single_bbox, bbox2, 0.99, new_annots)
-                    new_bbox = remove_duplicates(new_annots)
+            #if i<12:
+            if appair['id'] == img_id:
+                new_annots = []
+                # Comparer chaque bbox à ceux dans appair et ajuster selon get_iou
+                for single_bbox in bbox:
+                    for bbox2 in appair['bboxes']:
+                        new_annots = get_iou(single_bbox, bbox2, 0.99, new_annots)
+                new_bbox = remove_duplicates(new_annots)
         
         # S'assurer que annotations_categories est ajusté si nécessaire
         extended_categories = anno['annotations_categories'][:]
         if len(new_bbox) > len(extended_categories):
             extended_categories.extend([None] * (len(new_bbox) - len(extended_categories)))
-        
+        if i%100 == 0:
+            print(f"Processed {i} annotations")
         # Créer une nouvelle annotation pour chaque bbox ajusté
         for j, single_bbox in enumerate(new_bbox):
             new_anno = {
