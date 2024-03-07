@@ -99,7 +99,7 @@ def main():
 
     ## Loadin the JSON = {images: [{}], annotations: [{}]}
 
-    path = './new_annotations/EMOTIC_test_x1y1x2y2.json'
+    path = './new_annotations/EMOTIC_val_x1y1x2y2.json'
     train = json.load(open(path))
     train_anno = train['annotations'] # dictionnary of annotations
     train_img = train['images'] # dictionnary of images
@@ -151,17 +151,17 @@ def main():
         
         # S'assurer que annotations_categories est ajusté si nécessaire
         extended_categories = anno['annotations_categories'][:]
-        if len(new_bbox) > len(extended_categories):
-            extended_categories.extend([None] * (len(new_bbox) - len(extended_categories)))
+        #if len(new_bbox) > len(extended_categories):
+            #extended_categories.extend([None] * (len(new_bbox) - len(extended_categories)))
         if i%100 == 0:
             print(f"Processed {i} annotations")
         # Créer une nouvelle annotation pour chaque bbox ajusté
         for j, single_bbox in enumerate(new_bbox):
             for i in range(len(bbox)):
-            if bbox[i] == single_bbox:
-                emo = extended_categories
-            else:
-                emo = None
+                if bbox[i] == single_bbox:
+                    emo = extended_categories
+                else:
+                    emo = None
             new_anno = {
                 'image_id': img_id,
                 'id': new_id,
