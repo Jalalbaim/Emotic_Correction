@@ -157,13 +157,18 @@ def main():
             print(f"Processed {i} annotations")
         # Créer une nouvelle annotation pour chaque bbox ajusté
         for j, single_bbox in enumerate(new_bbox):
+            for i in range(len(bbox)):
+            if bbox[i] == single_bbox:
+                emo = extended_categories
+            else:
+                emo = None
             new_anno = {
                 'image_id': img_id,
                 'id': new_id,
                 'category_id': category_id,
                 'bbox': single_bbox,
                 'coco_ids': anno['coco_ids'],
-                'annotations_categories': extended_categories[j] if j < len(extended_categories) else None,
+                'annotations_categories': emo,
                 'annotations_continuous': anno['annotations_continuous'],
                 'gender': anno['gender'],
                 'age': anno['age'],
