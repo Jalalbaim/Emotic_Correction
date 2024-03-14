@@ -6,6 +6,8 @@ from PIL import Image
 from torchvision.transforms import functional as F
 import os
 import json
+from transformers import AutoImageProcessor, DetrForObjectDetection
+import requests 
 
 """
 Description:
@@ -18,47 +20,18 @@ This script is written to correct the Emotic Dataset annotations using the DETR 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
-# Importing model 
-model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True).to(device)
-model.eval()
-
-# functions
-
-# standard PyTorch mean-std input image normalization
-transform = T.Compose([
-    T.Resize(800),
-    T.Lambda(lambda img: img.convert('RGB')),
-    T.ToTensor(),
-    T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
-
-def transform_image(img):
-    transformed_img = transform(img)
-    return transformed_img
-
-def rescale_bboxes(out_bbox, size):
-    img_w, img_h = size
-    b = box_cxcywh_to_xyxy(out_bbox)
-    b = b * torch.tensor([img_w, img_h, img_w, img_h], dtype=torch.float32).to(device)
-    return b
-
-def box_cxcywh_to_xyxy(x):
-    x_c, y_c, w, h = x.unbind(1)
-    b = [(x_c - 0.5 * w), (y_c - 0.5 * h),
-         (x_c + 0.5 * w), (y_c + 0.5 * h)]
-    return torch.stack(b, dim=1)
-
 def model_results(img):
-    img = transform_image(img).unsqueeze(0).to(device)
-    outputs = model(img)
-    # keep only predictions with 0.9+ confidence and labeled as "person"
-    probas = outputs['pred_logits'].softmax(-1)[0, :, :-1]
-    keep = (probas.max(-1).values > 0.9) & (probas.argmax(-1) == 1)  # Filter for "person" class
-    # convert boxes from [0; 1] to image scales
-    # Correcting the line causing TypeError
-    bboxes_scaled = rescale_bboxes(outputs['pred_boxes'][0, keep], img.size()[2:])
-    bboxes_scaled = bboxes_scaled.tolist()
-    return bboxes_scaled , probas[keep]
+    image_processor = AutoImageProcessor.from_pretrained("facebook/detr-resnet-50")
+    model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50").to(device)
+    inputs = image_processor(images=img, return_tensors="pt").to(device)
+    outputs = model(**inputs)
+
+    target_sizes = torch.tensor([img.size[::-1]])
+    results = image_processor.post_process_object_detection(outputs, threshold=0.9, target_sizes=torch.tensor([img.size[::-1]]).to(device))[0]
+    
+    bboxes = [[int(x) for x in bbox] for bbox in results["boxes"].cpu().tolist()]
+    bboxes = bboxes[:50]
+    return bboxes 
 
 def iou(box1, box2):
     x1, y1, x2, y2 = box1
@@ -99,7 +72,7 @@ def main():
 
     ## Loadin the JSON = {images: [{}], annotations: [{}]}
 
-    path = './new_annotations/EMOTIC_val_x1y1x2y2.json'
+    path = './new_annotations/EMOTIC_test_x1y1x2y2.json'
     train = json.load(open(path))
     train_anno = train['annotations'] # dictionnary of annotations
     train_img = train['images'] # dictionnary of images
@@ -119,7 +92,9 @@ def main():
         folder = image['folder']
         img_path = original_path + '/' + folder + '/' + file_name
         img = Image.open(img_path)
-        bboxes , probas = model_results(img)
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        bboxes = model_results(img)
         list_appair.append({'id': image['id'], 'bboxes': bboxes})
         k+=1
     

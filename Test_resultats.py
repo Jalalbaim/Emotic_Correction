@@ -8,6 +8,7 @@ import os
 import json
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+#from transformers import DetrImageProcessor, DetrForObjectDetection
 
 
 """
@@ -101,8 +102,10 @@ def plot_results(pil_img, prob, boxes):
 
 def main():
     
-    path = "EMOTIC (1)\EMOTIC\PAMI\emotic\mscoco\images\COCO_val2014_000000482242.jpg"
+    path = "EMOTIC (1)\EMOTIC\PAMI\emotic\emodb_small\images/0crce5soni30mrvq7t.jpg"
+
     path = path.replace("\\", "/")  
+    
     image = Image.open(path)
     """
     image = plt.imread(path)
