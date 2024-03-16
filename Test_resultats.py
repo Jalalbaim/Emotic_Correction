@@ -8,7 +8,7 @@ import os
 import json
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-#from transformers import DetrImageProcessor, DetrForObjectDetection
+from transformers import AutoImageProcessor, DetrForObjectDetection
 
 
 """
@@ -22,9 +22,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 # Importing model 
-model = torch.hub.load('facebookresearch/detr:main', 'detr_resnet50', pretrained=True).to(device)
-model.eval()
-
+image_processor = AutoImageProcessor.from_pretrained("facebook/detr-resnet-50")
+model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50")
 
 # standard PyTorch mean-std input image normalization
 transform = T.Compose([
@@ -51,8 +50,10 @@ def box_cxcywh_to_xyxy(x):
     return torch.stack(b, dim=1)
 
 def model_results(img):
-    img = transform_image(img).unsqueeze(0).to(device)
-    outputs = model(img)
+    inputs = image_processor(images=image, return_tensors="pt")
+    outputs = model(**inputs)
+    target_sizes = torch.tensor([img.size[::-1]])
+    results = image_processor.post_process_object_detection(outputs, threshold=0.9, target_sizes=target_sizes)[0]
     # keep only predictions with 0.9+ confidence and labeled as "person"
     probas = outputs['pred_logits'].softmax(-1)[0, :, :-1]
     keep = (probas.max(-1).values > 0.9) & (probas.argmax(-1) == 1)  # Filter for "person" class
