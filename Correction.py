@@ -98,7 +98,7 @@ def main():
 
     ## Loadin the JSON = {images: [{}], annotations: [{}]}
 
-    path = './new_annotations/EMOTIC_val_x1y1x2y2.json'
+    path = './new_annotations/EMOTIC_test_x1y1x2y2.json'
     train = json.load(open(path))
     train_anno = train['annotations'] # dictionnary of annotations
     train_img = train['images'] # dictionnary of images
@@ -179,8 +179,8 @@ def main():
 
     # Save the new annotations as a JSON file
                 
-    #filename = './newest' + os.path.basename(path)
-    filename = './test_anno/nycu' + os.path.basename(path)
+    filename = './newest' + os.path.basename(path)
+    #filename = './test_anno/nycu' + os.path.basename(path)
 
     # Create a dictionary with the images and annotations
     mixed_data = {'images': train_img, 'annotations': new_annotations, 'categories': train['categories']}
