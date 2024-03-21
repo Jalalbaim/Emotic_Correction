@@ -149,6 +149,8 @@ def main():
                     for bbox2 in appair['bboxes']:
                         new_annots = get_iou(single_bbox, bbox2, 0.8, new_annots)
                 new_bbox = remove_duplicates(new_annots)
+                if len(new_bbox) > 30:
+                    new_bbox = new_bbox[:30]
         
         # S'assurer que annotations_categories est ajusté si nécessaire
         extended_categories = anno['annotations_categories'][:]
