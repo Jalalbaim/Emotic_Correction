@@ -21,16 +21,41 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device: {device}")
 
 def model_results(img):
+
     image_processor = AutoImageProcessor.from_pretrained("facebook/detr-resnet-50")
     model = DetrForObjectDetection.from_pretrained("facebook/detr-resnet-50").to(device)
     inputs = image_processor(images=img, return_tensors="pt").to(device)
     outputs = model(**inputs)
 
-    target_sizes = torch.tensor([img.size[::-1]])
     results = image_processor.post_process_object_detection(outputs, threshold=0.9, target_sizes=torch.tensor([img.size[::-1]]).to(device))[0]
     
-    bboxes = [[int(x) for x in bbox] for bbox in results["boxes"].cpu().tolist()]
-    bboxes = bboxes[:50]
+    person_scores = []
+    person_labels = []
+    person_boxes = []
+
+    for score, label, box in zip(results["scores"], results["labels"], results["boxes"]):
+        if model.config.id2label[label.item()] == 'person':
+            person_labels.append(label)
+            person_boxes.append(box)
+            person_scores.append(score.item())  
+
+    # Sorting the results by score
+    sorted_indices = np.argsort(person_scores)[::-1]  
+
+    sorted_person_labels = [person_labels[i] for i in sorted_indices]
+    sorted_person_boxes = [person_boxes[i] for i in sorted_indices]
+    sorted_person_scores = [person_scores[i] for i in sorted_indices]
+
+
+    sorted_results = {
+        "scores": sorted_person_scores,
+        "labels": sorted_person_labels,
+        "boxes": sorted_person_boxes
+    }
+
+    bboxes = [[int(x) for x in bbox] for bbox in sorted_results["boxes"]]
+    bboxes = bboxes[:15]
+
     return bboxes 
 
 def iou(box1, box2):
@@ -56,11 +81,12 @@ def iou(box1, box2):
 
 def get_iou(bbox1, bbox2, thresh, new_annots = []):
     iou_score = iou(bbox1, bbox2)
-    if iou_score < thresh:
+    if iou_score > thresh:
+        new_annots.append(bbox1)
+        #new_annots.append(bbox2)
+    else:
         new_annots.append(bbox1)
         new_annots.append(bbox2)
-    else:
-        pass
     return new_annots
 
 def remove_duplicates(lst):
@@ -104,7 +130,7 @@ def main():
 
     new_annotations = []
     new_id = 0
-
+    
     for i, anno in enumerate(train_new_annots):
         i+=1
         img_id = anno['image_id']
@@ -121,7 +147,7 @@ def main():
                 # Comparer chaque bbox à ceux dans appair et ajuster selon get_iou
                 for single_bbox in bbox:
                     for bbox2 in appair['bboxes']:
-                        new_annots = get_iou(single_bbox, bbox2, 0.99, new_annots)
+                        new_annots = get_iou(single_bbox, bbox2, 0.8, new_annots)
                 new_bbox = remove_duplicates(new_annots)
         
         # S'assurer que annotations_categories est ajusté si nécessaire
@@ -150,10 +176,11 @@ def main():
             }
             new_annotations.append(new_anno)
             new_id += 1
-    
+
     # Save the new annotations as a JSON file
                 
-    filename = './newest' + os.path.basename(path)
+    #filename = './newest' + os.path.basename(path)
+    filename = './test_anno/nycu' + os.path.basename(path)
 
     # Create a dictionary with the images and annotations
     mixed_data = {'images': train_img, 'annotations': new_annotations, 'categories': train['categories']}
