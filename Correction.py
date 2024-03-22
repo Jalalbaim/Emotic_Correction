@@ -27,7 +27,7 @@ def model_results(img):
     inputs = image_processor(images=img, return_tensors="pt").to(device)
     outputs = model(**inputs)
 
-    results = image_processor.post_process_object_detection(outputs, threshold=0.9, target_sizes=torch.tensor([img.size[::-1]]).to(device))[0]
+    results = image_processor.post_process_object_detection(outputs, threshold=0.95, target_sizes=torch.tensor([img.size[::-1]]).to(device))[0]
     
     person_scores = []
     person_labels = []
