@@ -81,12 +81,12 @@ def iou(box1, box2):
 
 def get_iou(bbox1, bbox2, thresh, new_annots = []):
     iou_score = iou(bbox1, bbox2)
-    if iou_score > thresh:
-        new_annots.append(bbox1)
-        #new_annots.append(bbox2)
-    else:
+    if iou_score < thresh:
         new_annots.append(bbox1)
         new_annots.append(bbox2)
+    else:
+        new_annots.append(bbox1)
+        #new_annots.append(bbox2)
     return new_annots
 
 def remove_duplicates(lst):
@@ -98,7 +98,7 @@ def main():
 
     ## Loadin the JSON = {images: [{}], annotations: [{}]}
 
-    path = './new_annotations/EMOTIC_test_x1y1x2y2.json'
+    path = './new_annotations/EMOTIC_val_x1y1x2y2.json'
     train = json.load(open(path))
     train_anno = train['annotations'] # dictionnary of annotations
     train_img = train['images'] # dictionnary of images
@@ -147,10 +147,10 @@ def main():
                 # Comparer chaque bbox à ceux dans appair et ajuster selon get_iou
                 for single_bbox in bbox:
                     for bbox2 in appair['bboxes']:
-                        new_annots = get_iou(single_bbox, bbox2, 0.8, new_annots)
+                        new_annots = get_iou(single_bbox, bbox2, 0.6, new_annots)
                 new_bbox = remove_duplicates(new_annots)
-                if len(new_bbox) > 30:
-                    new_bbox = new_bbox[:30]
+        
+        
         
         # S'assurer que annotations_categories est ajusté si nécessaire
         extended_categories = anno['annotations_categories'][:]
@@ -159,6 +159,9 @@ def main():
         if i%100 == 0:
             print(f"Processed {i} annotations")
         # Créer une nouvelle annotation pour chaque bbox ajusté
+        if len(new_bbox) > 30:
+            new_bbox = new_bbox[:30]
+
         for j, single_bbox in enumerate(new_bbox):
             for i in range(len(bbox)):
                 if bbox[i] == single_bbox:
