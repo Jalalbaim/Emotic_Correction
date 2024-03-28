@@ -132,6 +132,7 @@ def main():
     new_id = 0
     
     for i, anno in enumerate(train_new_annots):
+        new_bbox = []
         i+=1
         img_id = anno['image_id']
         category_id = anno['category_id']
@@ -147,7 +148,7 @@ def main():
                 # Comparer chaque bbox à ceux dans appair et ajuster selon get_iou
                 for single_bbox in bbox:
                     for bbox2 in appair['bboxes']:
-                        new_annots = get_iou(single_bbox, bbox2, 0.8, new_annots)
+                        get_iou(single_bbox, bbox2, 0.8, new_annots)
                 new_bbox = remove_duplicates(new_annots)
         
         
