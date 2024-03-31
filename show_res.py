@@ -59,9 +59,9 @@ def draw_res(data, img):
 
 def main():
     thresh = 0.8
-    json_path = "./newestEMOTIC_train_x1y1x2y2.json"
+    json_path = "./newest_EMOTIC_train_x1y1x2y2.json"
     emotic_path = './EMOTIC (1)/EMOTIC/PAMI/emotic'
-    Data = json.load(json_path=json_path)
+    Data = json.load(open(json_path))
     random_list = [random.randint(0, len(Data)-1) for i in range(15)]
 
     for id in random_list:

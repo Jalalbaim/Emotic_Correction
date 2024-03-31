@@ -22,6 +22,7 @@ import requests
 # Constants
 THRESHOLD = 0.95
 MAX_ANNotATIONS = 30
+IOU_THRESHOLD = 0.99
 
 def load_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -62,15 +63,26 @@ def model_results(img, model, image_processor, device):
     
     return bboxes[:MAX_ANNotATIONS]
 
-def iou(box1, box2):
-    """Calculates Intersection Over Union (IOU) between two bounding boxes."""
-    x1, y1, x2, y2 = box1
-    x1g, y1g, x2g, y2g = box2
-    interArea = max(0, min(x2, x2g) - max(x1, x1g)) * max(0, min(y2, y2g) - max(y1, y1g))
-    boxAArea = (x2 - x1) * (y2 - y1)
-    boxBArea = (x2g - x1g) * (y2g - y1g)
-    iou = interArea / float(boxAArea + boxBArea - interArea)
-    return iou
+def iou(bbox1, bbox2):
+    """Calcul de l'Intersection over Union (IoU) entre deux bboxes."""
+    x1, y1, x2, y2 = bbox1
+    x1_p, y1_p, x2_p, y2_p = bbox2
+    
+    # Calcul de l'aire d'intersection
+    xi1 = max(x1, x1_p)
+    yi1 = max(y1, y1_p)
+    xi2 = min(x2, x2_p)
+    yi2 = min(y2, y2_p)
+    inter_area = max(xi2 - xi1, 0) * max(yi2 - yi1, 0)
+    
+    # Aire des bboxes
+    bbox1_area = (x2 - x1) * (y2 - y1)
+    bbox2_area = (x2_p - x1_p) * (y2_p - y1_p)
+    
+    # Calcul de l'IoU
+    union_area = bbox1_area + bbox2_area - inter_area
+    IoU = inter_area / union_area
+    return IoU
 
 """
 def remove_duplicates(lst):
@@ -79,21 +91,38 @@ def remove_duplicates(lst):
 
 def remove_duplicates(bboxes):
     """Remove duplicate bounding boxes."""
-    unique_bboxes = []
-    [unique_bboxes.append(x) for x in bboxes if x not in unique_bboxes]
-    return unique_bboxes
+    liste_tuple = [tuple(item) for item in bboxes]
+    liste_sans_duplicatas = [list(item) for item in set(liste_tuple)]
+    return liste_sans_duplicatas
 
+"""
 def get_iou_annotations(anno_bboxes, model_bboxes):
-    # Copie des boîtes d'annotations originales
+    filtered_newbboxes = []
+    newest_anno = []
+    for newbbox in model_bboxes:
+        overlaps = False
+        for oldbbox in anno_bboxes:
+            if iou(newbbox, oldbbox) > IOU_THRESHOLD:
+                overlaps = True
+                break
+        if not overlaps and newbbox not in filtered_newbboxes:
+            filtered_newbboxes.append(newbbox)
+    fin = anno_bboxes + filtered_newbboxes
+    newest_anno = remove_duplicates(fin)
+    return newest_anno
+
+
+def get_iou_annotations(anno_bboxes, model_bboxes,threshold=0.0001):
+     # Copie des boîtes d'annotations originales
     new_annots = anno_bboxes.copy()
     added_bboxes = []  # Liste pour les boîtes prédites à ajouter
 
     for anno_bbox in anno_bboxes:
         for model_bbox in model_bboxes:
-            if iou(anno_bbox, model_bbox) >= 0.5:
+            if iou(anno_bbox, model_bbox) >= IOU_THRESHOLD:
                 # treshold à augmenter ou garder un bbox sur 2
                 added_bboxes.append(model_bbox)
-                break  # Garde le 'break' si une seule correspondance est nécessaire
+                break  
 
     # Ajoute les nouvelles boîtes tout en évitant les doublons potentiels
     for bbox in added_bboxes:
@@ -103,25 +132,27 @@ def get_iou_annotations(anno_bboxes, model_bboxes):
     # Assumant que remove_duplicates est bien implémentée pour des boîtes englobantes
     new_annots = remove_duplicates(new_annots)
     return new_annots
-
 """
 
-def get_iou_annotations(anno_bboxes, model_bboxes,threshold=0.0001):
-    # Adjusts annotation bounding boxes based on IOU with model predictions
-    new_annots = []
-    keep_flags = [True] * len(model_bboxes)
-    for i, model_bbox in enumerate(model_bboxes):
-        for anno_bbox in anno_bboxes: 
-            if iou(anno_bbox, model_bbox) >= threshold:
-                keep_flags[i] = False
-                break 
-
-    adjusted_model_bboxes = [bbox for bbox, keep in zip(model_bboxes, keep_flags) if keep]
-
-    new_annots = remove_duplicates(anno_bboxes + adjusted_model_bboxes)
-
+def get_iou_annotations(anno_bboxes, model_bboxes):
+    new_annots = anno_bboxes.copy()
+    
+    for model_bbox in model_bboxes:
+        # Vérifier si le bbox courant doit être ajouté
+        add_bbox = True
+        for anno_bbox in anno_bboxes:
+            if iou(anno_bbox, model_bbox) >= IOU_THRESHOLD:
+                # Si l'IoU dépasse le seuil, ne pas ajouter le bbox du modèle
+                add_bbox = False
+                break
+        if add_bbox:
+            # Ajouter le bbox à la liste s'il n'est pas déjà couvert
+            new_annots.append(model_bbox)
+    
+    # Optionnel : supprimer les doublons, si nécessaire
+    new_annots = remove_duplicates(new_annots)
+    
     return new_annots
-"""
 
 def process_images(train_img, original_path, model, image_processor, device):
     list_appair = []
