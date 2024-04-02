@@ -21,8 +21,8 @@ import requests
 
 # Constants
 THRESHOLD = 0.95
-MAX_ANNotATIONS = 30
-IOU_THRESHOLD = 0.99
+MAX_ANNotATIONS = 40
+IOU_THRESHOLD = 0.1
 
 def load_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -63,7 +63,7 @@ def model_results(img, model, image_processor, device):
     
     return bboxes[:MAX_ANNotATIONS]
 
-def iou(bbox1, bbox2):
+def get_iou(bbox1, bbox2):
     """Calcul de l'Intersection over Union (IoU) entre deux bboxes."""
     x1, y1, x2, y2 = bbox1
     x1_p, y1_p, x2_p, y2_p = bbox2
@@ -95,23 +95,32 @@ def remove_duplicates(bboxes):
     liste_sans_duplicatas = [list(item) for item in set(liste_tuple)]
     return liste_sans_duplicatas
 
-"""
-def get_iou_annotations(anno_bboxes, model_bboxes):
+
+def get_iou_annotations(anno_bboxes: list, model_bboxes: list):
     filtered_newbboxes = []
     newest_anno = []
     for newbbox in model_bboxes:
         overlaps = False
         for oldbbox in anno_bboxes:
-            if iou(newbbox, oldbbox) > IOU_THRESHOLD:
+            iou = get_iou(newbbox,oldbbox)
+            print("Iou",iou)
+            if iou > IOU_THRESHOLD:
                 overlaps = True
                 break
         if not overlaps and newbbox not in filtered_newbboxes:
             filtered_newbboxes.append(newbbox)
-    fin = anno_bboxes + filtered_newbboxes
-    newest_anno = remove_duplicates(fin)
-    return newest_anno
+    
+    fein = anno_bboxes + filtered_newbboxes
+
+    newest_anno = remove_duplicates(fein)
+    return newest_anno[:MAX_ANNotATIONS]
 
 
+def eliminer_duplicatas(liste):
+    liste_tuple = [tuple(item) for item in liste]
+    liste_sans_duplicatas = [list(item) for item in set(liste_tuple)]
+    return liste_sans_duplicatas
+"""
 def get_iou_annotations(anno_bboxes, model_bboxes,threshold=0.0001):
      # Copie des boîtes d'annotations originales
     new_annots = anno_bboxes.copy()
@@ -119,7 +128,7 @@ def get_iou_annotations(anno_bboxes, model_bboxes,threshold=0.0001):
 
     for anno_bbox in anno_bboxes:
         for model_bbox in model_bboxes:
-            if iou(anno_bbox, model_bbox) >= IOU_THRESHOLD:
+            if get_iou(anno_bbox, model_bbox) >= IOU_THRESHOLD:
                 # treshold à augmenter ou garder un bbox sur 2
                 added_bboxes.append(model_bbox)
                 break  
@@ -131,29 +140,29 @@ def get_iou_annotations(anno_bboxes, model_bboxes,threshold=0.0001):
 
     # Assumant que remove_duplicates est bien implémentée pour des boîtes englobantes
     new_annots = remove_duplicates(new_annots)
-    return new_annots
-"""
+    return new_annots[:30]
+
 
 def get_iou_annotations(anno_bboxes, model_bboxes):
-    new_annots = anno_bboxes.copy()
-    
-    for model_bbox in model_bboxes:
-        # Vérifier si le bbox courant doit être ajouté
-        add_bbox = True
-        for anno_bbox in anno_bboxes:
-            if iou(anno_bbox, model_bbox) >= IOU_THRESHOLD:
-                # Si l'IoU dépasse le seuil, ne pas ajouter le bbox du modèle
-                add_bbox = False
-                break
-        if add_bbox:
-            # Ajouter le bbox à la liste s'il n'est pas déjà couvert
-            new_annots.append(model_bbox)
-    
-    # Optionnel : supprimer les doublons, si nécessaire
-    new_annots = remove_duplicates(new_annots)
-    
-    return new_annots
+    # Initialisation de la liste finale des annotations
+    final_annotations = anno_bboxes.copy()
 
+    # Parcourir chaque bbox modèle pour le comparer avec les bboxes existants
+    for model_bbox in model_bboxes:
+        max_iou = 0.0  # Initialiser le IoU maximum trouvé pour le bbox modèle actuel
+        # Comparer avec chaque bbox d'annotation
+        for anno_bbox in anno_bboxes:
+            iou = get_iou(anno_bbox, model_bbox)
+            max_iou = max(max_iou, iou)  # Mise à jour du IoU maximum
+
+        # Si l'IoU maximum est inférieur au seuil, ajouter le bbox modèle à la liste finale
+        if max_iou < IOU_THRESHOLD:
+            final_annotations.append(model_bbox)
+    
+    final_annotations = remove_duplicates(final_annotations) 
+
+    return final_annotations
+"""
 def process_images(train_img, original_path, model, image_processor, device):
     list_appair = []
     for k, image in enumerate(train_img):
@@ -166,33 +175,65 @@ def process_images(train_img, original_path, model, image_processor, device):
     return list_appair
 
 def process_annotations(train_anno, list_appair):
+    # Initial setup remains the same
     new_annotations = []
     new_id = 0
-    for i, anno in enumerate(train_anno):
-        img_id = anno['image_id']
-        anno_bboxes = [anno['bbox']] if not isinstance(anno['bbox'][0], list) else anno['bbox']
+    annotations_by_image_id = {}
+
+    for img in train_anno:
+        annotation = {
+            'bbox': img['bbox'],
+            'category_id': img['category_id'],
+            'annotations_categories': img.get('annotations_categories', []),
+            'annotations_continuous': img.get('annotations_continuous', {}),
+            'gender': img.get('gender', None),
+            'age': img.get('age', None),
+            'coco_ids': img.get('coco_ids', None),
+
+        }
+
+        if img["image_id"] not in annotations_by_image_id:
+            annotations_by_image_id[img["image_id"]] = [annotation]
+        else:
+            annotations_by_image_id[img["image_id"]].append(annotation)
+    i=0
+    for img_id, annotations in annotations_by_image_id.items():
+        anno_bboxes = [anno['bbox'] for anno in annotations]
         matched_appair = next((app for app in list_appair if app['id'] == img_id), None)
+
         if matched_appair:
             adjusted_bboxes = get_iou_annotations(anno_bboxes, matched_appair['bboxes'])
-            for bbox in adjusted_bboxes:
-                new_annotations.append({
-                    'image_id': img_id,
-                    'id': new_id,
-                    'category_id': anno['category_id'],
-                    'bbox': bbox,
-                    'coco_ids': anno.get('coco_ids'),
-                    'annotations_categories': anno.get('annotations_categories'),
-                    'annotations_continuous': anno.get('annotations_continuous'),
-                    'gender': anno.get('gender'),
-                    'age': anno.get('age'),
-                })
-                new_id += 1
+            # [[start_x, start_y, end_x, end_y], [start_x, start_y, end_x, end_y], ...]
+              
+            annotations_by_image_id[img_id]
+
+            for i, anno in enumerate(adjusted_bboxes):
+                try:
+                    annotations[i]['bbox'] = anno
+                    new_id += 1
+                    new_annotations.append({
+                        'image_id': img_id,
+                        'id': new_id,
+                        'bbox': anno,
+                        'category_id': annotations[i]['category_id'],
+                        'annotations_categories': annotations[i].get('annotations_categories', []),
+                        'annotations_continuous': annotations[i].get('annotations_continuous', {}),
+                        'gender': annotations[i].get('gender', None),
+                        'age': annotations[i].get('age', None),
+                        'coco_ids': annotations[i].get('coco_ids', None),
+                    })
+                except:
+                    print("image_id",img_id)
+                    print("annotations",annotations)
+                    continue
+
         if (i + 1) % 100 == 0:
             print(f"Processed {i + 1} annotations")
-    return new_annotations
+    return new_annotations  
 
 def main():
-    path = './new_annotations/EMOTIC_train_x1y1x2y2.json'
+    path = './new_annotations/EMOTIC_val_x1y1x2y2.json'
+    #path = './test11095.json'
     with open(path, 'r') as file:
         train = json.load(file)
 
@@ -211,3 +252,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+"""
+'category_id': feeein[img_id].get('category_id'),
+                    'coco_ids': feeein[img_id].get('coco_ids', []),
+                    'annotations_categories': feeein[img_id].get('annotations_categories', []),
+                    'annotations_continuous': feeein[img_id].get('annotations_continuous', {}),
+                    'gender': feeein[img_id].get('gender', None),
+                    'age': feeein[img_id].get('age', None),
+"""
