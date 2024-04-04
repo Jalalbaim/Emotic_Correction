@@ -21,8 +21,8 @@ import requests
 
 # Constants
 THRESHOLD = 0.95
-MAX_ANNotATIONS = 40
-IOU_THRESHOLD = 0.1
+MAX_ANNotATIONS = 50
+IOU_THRESHOLD = 0.9
 
 def load_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -61,7 +61,7 @@ def model_results(img, model, image_processor, device):
 
     bboxes = [[int(x) for x in bbox] for bbox in sorted_results["boxes"]]
     
-    return bboxes[:MAX_ANNotATIONS]
+    return bboxes
 
 def get_iou(bbox1, bbox2):
     """Calcul de l'Intersection over Union (IoU) entre deux bboxes."""
@@ -95,7 +95,7 @@ def remove_duplicates(bboxes):
     liste_sans_duplicatas = [list(item) for item in set(liste_tuple)]
     return liste_sans_duplicatas
 
-
+"""
 def get_iou_annotations(anno_bboxes: list, model_bboxes: list):
     filtered_newbboxes = []
     newest_anno = []
@@ -140,9 +140,9 @@ def get_iou_annotations(anno_bboxes, model_bboxes,threshold=0.0001):
 
     # Assumant que remove_duplicates est bien implémentée pour des boîtes englobantes
     new_annots = remove_duplicates(new_annots)
-    return new_annots[:30]
+    return new_annots
 
-
+"""
 def get_iou_annotations(anno_bboxes, model_bboxes):
     # Initialisation de la liste finale des annotations
     final_annotations = anno_bboxes.copy()
@@ -198,42 +198,49 @@ def process_annotations(train_anno, list_appair):
             annotations_by_image_id[img["image_id"]].append(annotation)
     i=0
     for img_id, annotations in annotations_by_image_id.items():
-        anno_bboxes = [anno['bbox'] for anno in annotations]
+        anno_bboxes = [anno['bbox'] if not isinstance(anno['bbox'][0], list) else anno['bbox'] for anno in annotations]
         matched_appair = next((app for app in list_appair if app['id'] == img_id), None)
-
+        print("Matched appair",matched_appair)
+        print("Anno bboxes",len(anno_bboxes))
+        print("Annotations",annotations)
         if matched_appair:
             adjusted_bboxes = get_iou_annotations(anno_bboxes, matched_appair['bboxes'])
             # [[start_x, start_y, end_x, end_y], [start_x, start_y, end_x, end_y], ...]
-              
+            
             annotations_by_image_id[img_id]
-
+            print("Adjusted bboxes",adjusted_bboxes)
+            print(len(adjusted_bboxes))
+            print("Annotations",annotations)
             for i, anno in enumerate(adjusted_bboxes):
-                try:
-                    annotations[i]['bbox'] = anno
-                    new_id += 1
-                    new_annotations.append({
-                        'image_id': img_id,
-                        'id': new_id,
-                        'bbox': anno,
-                        'category_id': annotations[i]['category_id'],
-                        'annotations_categories': annotations[i].get('annotations_categories', []),
-                        'annotations_continuous': annotations[i].get('annotations_continuous', {}),
-                        'gender': annotations[i].get('gender', None),
-                        'age': annotations[i].get('age', None),
-                        'coco_ids': annotations[i].get('coco_ids', None),
-                    })
+                #try:
+                #annotations[i]['bbox'] = anno
+                new_id += 1
+                new_annotations.append({
+                    'image_id': img_id,
+                    'id': new_id,
+                    'bbox': anno,
+                    'category_id': annotations[i].get('category_id', 0) if i < len(annotations) else 0,
+                    'annotations_categories': annotations[i].get('annotations_categories', []) if i < len(annotations) else [],
+                    'annotations_continuous': annotations[i].get('annotations_continuous', {}) if i < len(annotations) else {},
+                    'gender': annotations[i].get('gender', None) if i < len(annotations) else None,
+                    'age': annotations[i].get('age', None) if i < len(annotations) else None,
+                    'coco_ids': annotations[i].get('coco_ids', None) if i < len(annotations) else None,
+                })
+
+                """
                 except:
                     print("image_id",img_id)
                     print("annotations",annotations)
                     continue
-
+                """
         if (i + 1) % 100 == 0:
             print(f"Processed {i + 1} annotations")
+        len(new_annotations)
     return new_annotations  
 
 def main():
-    path = './new_annotations/EMOTIC_val_x1y1x2y2.json'
-    #path = './test11095.json'
+    #path = './new_annotations/EMOTIC_val_x1y1x2y2.json'
+    path = './test11095.json'
     with open(path, 'r') as file:
         train = json.load(file)
 
