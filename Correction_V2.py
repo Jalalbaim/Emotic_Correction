@@ -200,17 +200,11 @@ def process_annotations(train_anno, list_appair):
     for img_id, annotations in annotations_by_image_id.items():
         anno_bboxes = [anno['bbox'] if not isinstance(anno['bbox'][0], list) else anno['bbox'] for anno in annotations]
         matched_appair = next((app for app in list_appair if app['id'] == img_id), None)
-        print("Matched appair",matched_appair)
-        print("Anno bboxes",len(anno_bboxes))
-        print("Annotations",annotations)
         if matched_appair:
             adjusted_bboxes = get_iou_annotations(anno_bboxes, matched_appair['bboxes'])
             # [[start_x, start_y, end_x, end_y], [start_x, start_y, end_x, end_y], ...]
             
             annotations_by_image_id[img_id]
-            print("Adjusted bboxes",adjusted_bboxes)
-            print(len(adjusted_bboxes))
-            print("Annotations",annotations)
             for i, anno in enumerate(adjusted_bboxes):
                 #try:
                 #annotations[i]['bbox'] = anno
@@ -235,12 +229,12 @@ def process_annotations(train_anno, list_appair):
                 """
         if (i + 1) % 100 == 0:
             print(f"Processed {i + 1} annotations")
-        len(new_annotations)
+        #len(new_annotations)
     return new_annotations  
 
 def main():
-    #path = './new_annotations/EMOTIC_val_x1y1x2y2.json'
-    path = './test11095.json'
+    path = './new_annotations/EMOTIC_test_x1y1x2y2.json'
+    #path = './test11095.json'
     with open(path, 'r') as file:
         train = json.load(file)
 
@@ -260,13 +254,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-
-
-"""
-'category_id': feeein[img_id].get('category_id'),
-                    'coco_ids': feeein[img_id].get('coco_ids', []),
-                    'annotations_categories': feeein[img_id].get('annotations_categories', []),
-                    'annotations_continuous': feeein[img_id].get('annotations_continuous', {}),
-                    'gender': feeein[img_id].get('gender', None),
-                    'age': feeein[img_id].get('age', None),
-"""
+# End of Correction_V2.py
