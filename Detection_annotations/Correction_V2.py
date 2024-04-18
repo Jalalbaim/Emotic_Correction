@@ -61,7 +61,7 @@ def model_results(img, model, image_processor, device):
 
     bboxes = [[int(x) for x in bbox] for bbox in sorted_results["boxes"]]
     
-    return bboxes
+    return bboxes[:MAX_ANNotATIONS]
 
 def get_iou(bbox1, bbox2):
     """Calcul de l'Intersection over Union (IoU) entre deux bboxes."""
